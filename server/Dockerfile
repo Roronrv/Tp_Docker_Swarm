@@ -1,30 +1,24 @@
-FROM node:24-alpine3.24 AS deps
-
+FROM node:22-alpine AS build
 WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-FROM node:24-alpine3.24 AS builder
-
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY src ./src
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 COPY tsconfig.json ./
-COPY package.json ./
+COPY src ./src
+RUN yarn build
 
-RUN npm run build
-
-CMD ["node", "dist/index.js"]
-
-FROM node:24-alpine3.24 AS main
-
+FROM node:22-alpine AS deps
 WORKDIR /app
+COPY package.json yarn.lock ./
+RUN npm pkg delete devDependencies \
+ && yarn install --frozen-lockfile --production \
+ && yarn cache clean
 
-COPY --from=builder /app/dist ./dist
+FROM node:22-alpine AS main
+WORKDIR /app
+ENV NODE_ENV=production
 COPY package.json ./
-
-RUN npm install --omit=dev
-
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+EXPOSE 3000
+USER node
 CMD ["node", "dist/index.js"]

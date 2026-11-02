@@ -1,0 +1,7 @@
+services:
+  hello:
+    image: hello-world
+    deploy:
+      mode: global   # une tâche sur chaque nœud du cluster
+      restart_policy:
+        condition: none

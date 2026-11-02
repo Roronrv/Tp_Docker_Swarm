@@ -1,0 +1,7 @@
+services:
+  hello:
+    image: hello-world
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: none   # hello-world s'arrête aussitôt : on évite le redémarrage en boucle

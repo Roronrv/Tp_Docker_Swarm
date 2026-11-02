@@ -1,0 +1,32 @@
+services:
+  manager:
+    image: docker:dind
+    privileged: true
+    hostname: manager
+    volumes:
+      - /home/manager   # volume anonyme : pérennise les fichiers de stack
+    ports:
+      - "80:80"   # expose Traefik (port 80 du manager) sur la machine hôte
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+
+  node1:
+    image: docker:dind
+    privileged: true
+    hostname: node1
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+
+  node2:
+    image: docker:dind
+    privileged: true
+    hostname: node2
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+
+  node3:
+    image: docker:dind
+    privileged: true
+    hostname: node3
+    environment:
+      DOCKER_TLS_CERTDIR: ""

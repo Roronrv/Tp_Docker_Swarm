@@ -1,29 +1,43 @@
 services:
-  client:
-    build: ./client
-    ports:
-      - "3000:3000"
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: supersecret
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   server:
-    build:
-      target: main
-      context: ./server
-    ports:
-      - "8080:3000"
+    build: ./server
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-
-  db:
-    image: postgres
     environment:
-      POSTGRES_PASSWORD: supersecret
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: supersecret
+      DB_NAME: postgres
+      SESSION_SECRET: superlongstring
     ports:
-      - "5432:5432"
-    volumes:
-      - /var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "3000:3000"
+
+  client:
+    build: ./client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+
+volumes:
+  db-data:
