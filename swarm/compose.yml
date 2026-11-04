@@ -30,3 +30,9 @@ services:
     hostname: node3
     environment:
       DOCKER_TLS_CERTDIR: ""
+
+  https-proxy:
+    image: alpine/socat
+    command: tcp-listen:443,fork,reuseaddr tcp-connect:manager:443
+    ports:
+      - "443:443"   # expose le port 443 du manager (Traefik HTTPS) sur la machine hôte

@@ -1,0 +1,70 @@
+server:
+  address: 'tcp://:9091/'
+
+log:
+  level: 'info'
+
+theme: 'auto'
+
+authentication_backend:
+  file:
+    # Comptes utilisateurs : secret Swarm (créé dans Portainer)
+    path: '/run/secrets/authelia_users'
+    watch: false
+
+access_control:
+  default_policy: 'one_factor'
+
+session:
+  cookies:
+    - domain: 'swarm.localhost'
+      authelia_url: 'https://authelia.swarm.localhost'
+      default_redirection_url: 'https://dozzle.swarm.localhost'
+
+storage:
+  local:
+    path: '/data/db.sqlite3'
+
+notifier:
+  filesystem:
+    filename: '/data/notification.txt'
+
+definitions:
+  user_attributes:
+    # Rôles Dozzle déduits des groupes Authelia
+    dozzle_roles:
+      expression: '"dozzle-admins" in groups ? ["all"] : []'
+
+identity_providers:
+  oidc:
+    # hmac_secret : fourni par la variable AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE
+    jwks:
+      - key_id: 'swarm'
+        algorithm: 'RS256'
+        use: 'sig'
+        key: {{ secret "/run/secrets/authelia_jwks_key" | mindent 10 "|" | msquote }}
+    claims_policies:
+      dozzle:
+        id_token: ['dozzle_roles']
+        custom_claims:
+          dozzle_roles: {}
+    scopes:
+      dozzle_roles:
+        claims: ['dozzle_roles']
+    clients:
+      - client_id: 'dozzle'
+        client_name: 'Dozzle'
+        # Empreinte (pbkdf2) du secret partagé avec Dozzle
+        client_secret: '$pbkdf2-sha512$310000$tK/53KytS/9lo4XYsz0eAw$Nmz.slgTuO321g3aFHmGDBJ5JG2rJmwXi/Lz.Y26bcmwVO4mmKmm4Fi.maUsBPyBSTDlTkkqQ5a57SUMqWqb/A'
+        public: false
+        authorization_policy: 'one_factor'
+        consent_mode: 'implicit'
+        claims_policy: 'dozzle'
+        redirect_uris:
+          - 'https://dozzle.swarm.localhost/api/auth/callback'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'dozzle_roles'
+        token_endpoint_auth_method: 'client_secret_basic'

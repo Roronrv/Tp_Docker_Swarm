@@ -1,0 +1,57 @@
+# Dozzle en mode Swarm, connexion via Authelia (OpenID Connect)
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    environment:
+      DOZZLE_MODE: swarm
+      DOZZLE_AUTH_PROVIDER: oidc
+      DOZZLE_AUTH_OIDC_NAME: Authelia
+      DOZZLE_AUTH_OIDC_ISSUER: https://authelia.swarm.localhost
+      DOZZLE_AUTH_OIDC_CLIENT_ID: dozzle
+      DOZZLE_AUTH_OIDC_CLIENT_SECRET_FILE: /run/secrets/dozzle_oidc_secret
+      DOZZLE_AUTH_OIDC_SCOPES: dozzle_roles
+      # Dozzle doit faire confiance à l'autorité qui a signé le certificat local d'Authelia
+      SSL_CERT_FILE: /swarm_ca.crt
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dozzle_data:/data
+    secrets:
+      - dozzle_oidc_secret   # secret partagé avec le client OIDC "dozzle" d'Authelia
+    configs:
+      - source: swarm_ca
+        target: /swarm_ca.crt
+    networks:
+      - dozzle
+      - web
+    deploy:
+      mode: global
+      labels:
+        - "traefik.enable=true"
+        # HTTPS : l'URL de retour d'Authelia est https://dozzle.swarm.localhost/api/auth/callback
+        - "traefik.http.routers.dozzle.rule=Host(`dozzle.swarm.localhost`)"
+        - "traefik.http.routers.dozzle.entrypoints=websecure"
+        - "traefik.http.routers.dozzle.tls=true"
+        - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+        - "traefik.http.services.dozzle.loadbalancer.sticky.cookie=true"
+        # Redirection HTTP -> HTTPS
+        - "traefik.http.routers.dozzle-http.rule=Host(`dozzle.swarm.localhost`)"
+        - "traefik.http.routers.dozzle-http.entrypoints=web"
+        - "traefik.http.routers.dozzle-http.middlewares=dozzle-https"
+        - "traefik.http.middlewares.dozzle-https.redirectscheme.scheme=https"
+
+networks:
+  dozzle:
+    driver: overlay
+  web:
+    external: true
+
+volumes:
+  dozzle_data:
+
+configs:
+  swarm_ca:
+    external: true
+
+secrets:
+  dozzle_oidc_secret:
+    external: true

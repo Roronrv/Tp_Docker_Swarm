@@ -1,0 +1,69 @@
+services:
+  traefik:
+    image: traefik:v3.6
+    networks:
+      web:
+        # Les conteneurs du cluster (ex. Dozzle) peuvent joindre Authelia par son nom public
+        aliases:
+          - authelia.swarm.localhost
+    ports:
+      - 80:80 # HTTP
+      - 443:443 # HTTPS (certificat local *.swarm.localhost)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    secrets:
+      - swarm_cert
+      - swarm_key
+    configs:
+      - source: traefik_tls
+        target: /etc/traefik/tls.yml
+    command:
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.swarm.endpoint=unix:///var/run/docker.sock"
+      - "--providers.swarm.watch=true"
+      - "--providers.swarm.exposedbydefault=false"
+      - "--providers.swarm.network=web"
+      # Certificat TLS par défaut, fourni par un fichier de configuration dynamique
+      - "--providers.file.filename=/etc/traefik/tls.yml"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.dashboard.rule=Host(`traefik.swarm.localhost`)"
+        - "traefik.http.routers.dashboard.entrypoints=web"
+        - "traefik.http.routers.dashboard.service=api@internal"
+        - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
+
+  whoami:
+    image: traefik/whoami
+    networks:
+      - web
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.whoami.rule=Host(`whoami.swarm.localhost`)"
+        - "traefik.http.routers.whoami.entrypoints=web"
+        - "traefik.http.services.whoami.loadbalancer.server.port=80"
+
+networks:
+  web:
+    external: true
+
+secrets:
+  swarm_cert:
+    external: true
+  swarm_key:
+    external: true
+
+configs:
+  traefik_tls:
+    external: true

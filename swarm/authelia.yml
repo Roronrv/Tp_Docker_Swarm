@@ -1,0 +1,64 @@
+services:
+  authelia:
+    image: authelia/authelia:latest
+    environment:
+      # Active le filtre qui lit les secrets dans configuration.yml ({{ secret "..." }})
+      X_AUTHELIA_CONFIG_FILTERS: template
+      # Secrets lus depuis des fichiers (secrets Swarm)
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/authelia_jwt
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE: /run/secrets/authelia_hmac
+    configs:
+      - source: authelia_config
+        target: /config/configuration.yml
+    secrets:
+      - authelia_users   # compte utilisateur, créé dans Portainer (users_database.yml)
+      - authelia_jwt
+      - authelia_session
+      - authelia_storage
+      - authelia_hmac
+      - authelia_jwks_key
+    volumes:
+      - authelia_data:/data
+    networks:
+      - web
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        # HTTPS (certificat local *.swarm.localhost)
+        - "traefik.http.routers.authelia.rule=Host(`authelia.swarm.localhost`)"
+        - "traefik.http.routers.authelia.entrypoints=websecure"
+        - "traefik.http.routers.authelia.tls=true"
+        - "traefik.http.services.authelia.loadbalancer.server.port=9091"
+        # Redirection HTTP -> HTTPS
+        - "traefik.http.routers.authelia-http.rule=Host(`authelia.swarm.localhost`)"
+        - "traefik.http.routers.authelia-http.entrypoints=web"
+        - "traefik.http.routers.authelia-http.middlewares=https-redirect"
+        - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+
+networks:
+  web:
+    external: true
+
+volumes:
+  authelia_data:
+
+configs:
+  authelia_config:
+    external: true
+
+secrets:
+  authelia_users:
+    external: true
+  authelia_jwt:
+    external: true
+  authelia_session:
+    external: true
+  authelia_storage:
+    external: true
+  authelia_hmac:
+    external: true
+  authelia_jwks_key:
+    external: true
